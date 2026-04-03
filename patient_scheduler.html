@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>患者予約管理システム</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Hiragino Sans', 'Meiryo', sans-serif; background: #f0f4f8; color: #2d3748; min-height: 100vh; }
+
+/* ── Header ─────────────────────────────────────────────── */
+header { background: #2b6cb0; color: white; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+header h1 { font-size: 19px; font-weight: 700; letter-spacing: 0.05em; }
+.date-nav { display: flex; align-items: center; gap: 8px; }
+.date-nav button { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 15px; transition: background 0.15s; }
+.date-nav button:hover { background: rgba(255,255,255,0.35); }
+#date-input { padding: 5px 9px; border-radius: 6px; border: none; font-size: 13px; cursor: pointer; background: white; color: #2d3748; }
+.today-btn { background: #ed8936 !important; border-color: #dd6b20 !important; font-size: 12px !important; padding: 5px 10px !important; }
+
+/* ── Tab bar ─────────────────────────────────────────────── */
+.tab-bar { background: #1a4a8a; display: flex; padding: 0 24px; gap: 2px; }
+.tab { padding: 9px 20px; cursor: pointer; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.65); border: none; background: none; border-bottom: 3px solid transparent; transition: all 0.15s; }
+.tab:hover { color: white; }
+.tab.active { color: white; border-bottom-color: #63b3ed; }
+
+/* ── Container / layout ──────────────────────────────────── */
+.container { padding: 20px 24px; max-width: 1200px; margin: 0 auto; }
+.section { display: none; }
+.section.active { display: block; }
+
+/* ── Summary bar ─────────────────────────────────────────── */
+.summary-bar { background: white; border-radius: 10px; padding: 12px 18px; margin-bottom: 14px; display: flex; gap: 20px; align-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.stat { display: flex; flex-direction: column; align-items: center; }
+.stat-num { font-size: 22px; font-weight: 700; color: #2b6cb0; }
+.stat-label { font-size: 11px; color: #718096; }
+.vdiv { width: 1px; height: 32px; background: #e2e8f0; }
+.date-display { font-size: 15px; font-weight: 600; color: #2d3748; margin-left: auto; }
+
+/* ── Horizontal Schedule Grid ────────────────────────────── */
+.sched-block { margin-bottom: 10px; }
+.sched-session-label { font-size: 12px; font-weight: 700; color: #718096; letter-spacing: 0.1em; padding: 6px 2px 4px; }
+.sched-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); background: white; }
+table.sched-grid { border-collapse: collapse; min-width: max-content; background: white; border-radius: 10px; overflow: hidden; }
+
+/* Sticky label column */
+.sticky-col { position: sticky; left: 0; z-index: 5; }
+.corner-hdr { min-width: 56px; width: 56px; background: #2b6cb0 !important; border-right: 2px solid rgba(255,255,255,0.25) !important; }
+.line-label { min-width: 56px; width: 56px; background: #f7fafc; font-size: 12px; font-weight: 700; color: #4a5568; text-align: center; padding: 0 4px; border-right: 2px solid #cbd5e0 !important; vertical-align: middle; }
+
+/* Time slot headers */
+.time-hdr { min-width: 78px; width: 78px; background: #2b6cb0; color: white; font-size: 11px; font-weight: 600; text-align: center; padding: 6px 4px; border-right: 1px solid rgba(255,255,255,0.15); cursor: pointer; white-space: nowrap; }
+.time-hdr:hover { background: #2563a8; }
+.time-hdr.hour-col { border-left: 2px solid rgba(255,255,255,0.4); }
+.time-hdr .t-main { font-size: 12px; display: block; }
+.time-hdr .t-memo { font-size: 10px; display: block; line-height: 1; margin-top: 2px; }
+
+/* Appointment cells */
+.appt-cell { min-width: 78px; width: 78px; height: 64px; border: 1px solid #e2e8f0; vertical-align: top; padding: 4px 6px; cursor: pointer; transition: filter 0.1s; }
+.appt-cell:hover { filter: brightness(0.94); }
+.empty-cell { background: white; }
+.empty-cell:hover { background: #f0f7ff !important; filter: none; }
+.filled-treat { background: #ebf8ff; border-color: #bee3f8 !important; }
+.filled-exam  { background: #f0fff4; border-color: #c6f6d5 !important; }
+.filled-newpt { background: #fffbeb; border-color: #fcd34d !important; }
+
+/* Memo row cells */
+.memo-row-cell { min-width: 78px; width: 78px; height: 38px; border: 1px solid #e8e8d8; background: #fefef5; vertical-align: top; padding: 4px 6px; cursor: text; font-size: 11px; color: #4a5568; font-family: inherit; outline: none; white-space: pre-wrap; word-break: break-all; }
+.memo-row-cell:focus { background: #fffff0; outline: 1px solid #4299e1; outline-offset: -1px; }
+.memo-row-cell:empty::before { content: attr(data-ph); color: #c8c8b0; font-style: italic; pointer-events: none; }
+.memo-label-cell { background: #f5f5e8 !important; font-size: 11px !important; color: #888 !important; font-weight: 600 !important; }
+
+/* Cell contents */
+.cell-name { font-size: 12px; font-weight: 700; color: #1a365d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 1px; }
+.cell-name:hover { color: #2b6cb0; }
+.cell-chart { font-size: 10px; color: #718096; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.cell-badge { margin-top: 3px; }
+.cell-plus { color: #d1d8e0; font-size: 20px; text-align: center; line-height: 56px; }
+
+/* Lunch break banner */
+.lunch-banner { background: #edf2f7; border: 1px solid #cbd5e0; border-radius: 8px; text-align: center; padding: 9px; font-size: 13px; font-weight: 600; color: #718096; letter-spacing: 0.1em; margin: 10px 0; }
+
+/* Badges */
+.badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 600; white-space: nowrap; }
+.b-treat { background: #bee3f8; color: #2c5282; }
+.b-exam  { background: #c6f6d5; color: #22543d; }
+.b-newpt { background: #feebc8; color: #7b341e; }
+.b-maint { background: #e9d8fd; color: #553c9a; }
+.b-ok    { background: #c6f6d5; color: #22543d; }
+.b-w0    { background: #fefcbf; color: #744210; }
+.b-w1    { background: #fed7d7; color: #822727; font-weight: 700; }
+.b-ed    { background: #e2e8f0; color: #4a5568; }
+
+/* ── Modal ───────────────────────────────────────────────── */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; align-items: center; justify-content: center; }
+.modal-overlay.active { display: flex; }
+.modal { background: white; border-radius: 12px; padding: 22px 26px; width: 440px; max-width: 96vw; max-height: 92vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.25); animation: pop-in 0.16s ease; }
+@keyframes pop-in { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 4px; color: #2d3748; }
+.slot-info { font-size: 12px; color: #718096; margin-bottom: 14px; }
+.seg-ctrl { display: flex; gap: 6px; margin-bottom: 12px; }
+.seg-btn { flex: 1; padding: 8px 4px; border: 2px solid #e2e8f0; border-radius: 7px; background: white; cursor: pointer; font-size: 12px; font-weight: 600; color: #718096; transition: all 0.15s; text-align: center; }
+.seg-btn:hover { border-color: #4299e1; color: #4299e1; }
+.seg-btn.act-normal { border-color: #4299e1; background: #ebf8ff; color: #2b6cb0; }
+.seg-btn.act-newpt  { border-color: #ed8936; background: #fffbeb; color: #c05621; }
+.seg-btn.act-treat  { border-color: #4299e1; background: #ebf8ff; color: #2b6cb0; }
+.seg-btn.act-exam   { border-color: #48bb78; background: #f0fff4; color: #276749; }
+.info-box { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px; padding: 9px 11px; font-size: 12px; color: #92400e; margin-bottom: 12px; line-height: 1.6; }
+.fg { margin-bottom: 11px; }
+.fg label { display: block; font-size: 12px; font-weight: 600; color: #4a5568; margin-bottom: 4px; }
+.fg input[type=text],.fg input[type=number],.fg textarea { padding: 7px 10px; border: 1.5px solid #e2e8f0; border-radius: 6px; font-size: 13px; color: #2d3748; outline: none; transition: border-color 0.15s; font-family: inherit; }
+.fg input[type=text] { width: 100%; }
+.fg input[type=number] { width: 80px; }
+.fg textarea { width: 100%; resize: vertical; min-height: 48px; }
+.fg input:focus,.fg textarea:focus { border-color: #4299e1; }
+.input-row { display: flex; gap: 10px; }
+.input-row .fg { flex: 1; }
+.section-sep { border: none; border-top: 1px dashed #e2e8f0; margin: 12px 0 10px; }
+.section-label { font-size: 10px; font-weight: 700; color: #a0aec0; letter-spacing: 0.08em; margin-bottom: 8px; }
+.chk-row { display: flex; align-items: center; gap: 7px; margin-bottom: 9px; }
+.chk-row input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; accent-color: #2b6cb0; }
+.chk-row label { font-size: 13px; color: #2d3748; cursor: pointer; font-weight: 500; }
+.prog-preview { background: #f7fafc; border-radius: 6px; padding: 8px 11px; margin-top: 10px; }
+.prog-label { font-size: 11px; color: #718096; margin-bottom: 2px; }
+.prog-value { font-weight: 700; font-size: 14px; }
+.prog-value.ok { color: #38a169; } .prog-value.caution { color: #d69e2e; } .prog-value.warning { color: #e53e3e; }
+.modal-btns { display: flex; gap: 8px; margin-top: 18px; }
+.modal-btns button { flex: 1; padding: 9px; border-radius: 6px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+.btn-save { background: #2b6cb0; color: white; } .btn-save:hover { opacity: 0.88; }
+.btn-cancel { background: #e2e8f0; color: #4a5568; } .btn-cancel:hover { background: #cbd5e0; }
+.btn-del-modal { background: #fc8181; color: white; } .btn-del-modal:hover { opacity: 0.82; }
+
+/* ── Patient Master section ──────────────────────────────── */
+.panel { background: white; border-radius: 10px; padding: 22px 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.panel h2 { font-size: 15px; font-weight: 700; color: #2d3748; margin-bottom: 16px; }
+.master-form { background: #f7fafc; border-radius: 8px; padding: 16px; margin-bottom: 18px; }
+.master-form-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.master-form .fg { margin-bottom: 0; }
+.master-form .fg input { width: 100%; }
+.fg-no { flex: 0 0 140px; }
+.fg-name { flex: 1; min-width: 160px; }
+.master-form-btns { display: flex; gap: 6px; align-self: flex-end; }
+.btn-register { padding: 7px 16px; background: #2b6cb0; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; height: 36px; transition: opacity 0.15s; white-space: nowrap; }
+.btn-register:hover { opacity: 0.88; }
+.btn-reg-cancel { padding: 7px 12px; background: #e2e8f0; color: #4a5568; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; height: 36px; transition: background 0.15s; white-space: nowrap; }
+.btn-reg-cancel:hover { background: #cbd5e0; }
+.master-search { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.master-search input { padding: 7px 11px; border: 1.5px solid #e2e8f0; border-radius: 6px; font-size: 13px; outline: none; width: 220px; font-family: inherit; }
+.master-search input:focus { border-color: #4299e1; }
+.master-count { font-size: 12px; color: #718096; }
+table.master-tbl { width: 100%; border-collapse: collapse; }
+table.master-tbl thead th { background: #4a5568; color: white; padding: 9px 12px; text-align: left; font-size: 12px; font-weight: 600; }
+table.master-tbl thead th:last-child { width: 80px; text-align: center; }
+table.master-tbl tbody tr { border-bottom: 1px solid #e2e8f0; }
+table.master-tbl tbody tr:last-child { border-bottom: none; }
+table.master-tbl tbody tr:hover { background: #f7fafc; }
+table.master-tbl tbody tr.editing-row { background: #ebf8ff !important; }
+table.master-tbl td { padding: 9px 12px; font-size: 13px; }
+table.master-tbl td:last-child { text-align: center; }
+.btn-edit-sm { background: none; border: 1px solid #4299e1; color: #4299e1; padding: 3px 9px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; margin-right: 4px; }
+.btn-edit-sm:hover { background: #ebf8ff; }
+.btn-del-sm { background: none; border: 1px solid #fc8181; color: #e53e3e; padding: 3px 9px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; }
+.btn-del-sm:hover { background: #fff5f5; }
+.no-master { text-align: center; padding: 28px; color: #a0aec0; font-size: 13px; }
+
+/* ── Payment section ─────────────────────────────────────── */
+.pay-form { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 18px; padding: 14px; background: #f7fafc; border-radius: 8px; }
+.pf-g { display: flex; flex-direction: column; gap: 4px; }
+.pf-g label { font-size: 11px; font-weight: 600; color: #4a5568; }
+.pf-g input,.pf-g select { padding: 7px 9px; border: 1.5px solid #e2e8f0; border-radius: 5px; font-size: 12px; color: #2d3748; outline: none; font-family: inherit; transition: border-color 0.15s; }
+.pf-g input:focus,.pf-g select:focus { border-color: #4299e1; }
+#pf-chart { width: 110px; } #pf-name { width: 120px; } #pf-amount { width: 110px; } #pf-method { width: 150px; }
+.btn-record { padding: 7px 16px; background: #2b6cb0; color: white; border: none; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; height: 34px; align-self: flex-end; white-space: nowrap; transition: opacity 0.15s; }
+.btn-record:hover { opacity: 0.88; }
+table.pay-tbl { width: 100%; border-collapse: collapse; }
+table.pay-tbl thead th { background: #4a5568; color: white; padding: 8px 11px; text-align: left; font-size: 11px; font-weight: 600; }
+table.pay-tbl tbody tr { border-bottom: 1px solid #e2e8f0; }
+table.pay-tbl tbody tr:last-child { border-bottom: none; }
+table.pay-tbl tbody tr:hover { background: #f7fafc; }
+table.pay-tbl td { padding: 7px 11px; font-size: 12px; }
+table.pay-tbl td:last-child { text-align: center; }
+.m-cash   { display:inline-block; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:600; background:#c6f6d5; color:#22543d; }
+.m-paypay { display:inline-block; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:600; background:#fed7d7; color:#822727; }
+.m-card   { display:inline-block; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:600; background:#bee3f8; color:#2c5282; }
+.no-pay { text-align:center; padding:22px; color:#a0aec0; font-size:13px; }
+.btn-delpay  { background:none; border:1px solid #fc8181; color:#e53e3e; padding:2px 8px; border-radius:4px; cursor:pointer; font-size:10px; font-weight:600; }
+.btn-delpay:hover  { background:#fff5f5; }
+.btn-editpay { background:none; border:1px solid #4299e1; color:#4299e1; padding:2px 8px; border-radius:4px; cursor:pointer; font-size:10px; font-weight:600; margin-right:4px; }
+.btn-editpay:hover { background:#ebf8ff; }
+.btn-pay-cancel { padding:7px 12px; background:#e2e8f0; color:#4a5568; border:none; border-radius:5px; font-size:12px; font-weight:600; cursor:pointer; height:34px; white-space:nowrap; transition:background 0.15s; }
+.btn-pay-cancel:hover { background:#cbd5e0; }
+.pay-editing-row td { background:#ebf8ff !important; }
+
+/* ── History popup ───────────────────────────────────────── */
+.hist-modal { width: 580px; }
+.hist-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+.hist-subtitle { font-size: 12px; color: #718096; margin-top: 3px; }
+.hist-close { background: none; border: none; cursor: pointer; font-size: 20px; color: #a0aec0; padding: 0 2px; line-height: 1; flex-shrink: 0; }
+.hist-close:hover { color: #2d3748; }
+.hist-meta { font-size: 12px; color: #718096; margin-bottom: 12px; }
+table.hist-tbl { width: 100%; border-collapse: collapse; }
+table.hist-tbl thead th { background: #4a5568; color: white; padding: 8px 10px; text-align: left; font-size: 12px; font-weight: 600; }
+table.hist-tbl thead th:nth-child(1) { width: 150px; }
+table.hist-tbl thead th:nth-child(2) { width: 115px; }
+table.hist-tbl thead th:nth-child(3) { width: 85px; text-align: center; }
+table.hist-tbl tbody tr { border-bottom: 1px solid #e2e8f0; }
+table.hist-tbl tbody tr:last-child { border-bottom: none; }
+table.hist-tbl tbody tr:hover { background: #f7fafc; }
+table.hist-tbl td { padding: 8px 10px; font-size: 13px; }
+table.hist-tbl td:nth-child(3) { text-align: center; }
+.hist-memo-cell { color: #718096; font-size: 12px; font-style: italic; }
+.hist-today { background: #ebf8ff !important; }
+.no-hist { text-align: center; padding: 24px; color: #a0aec0; font-size: 13px; }
+
+/* ── Toast ───────────────────────────────────────────────── */
+.toast { position:fixed; bottom:28px; left:50%; transform:translateX(-50%) translateY(20px); background:#2d3748; color:white; padding:9px 20px; border-radius:8px; font-size:13px; opacity:0; transition:opacity 0.25s,transform 0.25s; z-index:200; pointer-events:none; }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* ── Loading / Saving ────────────────────────────────────── */
+.loading-overlay { display:none; position:fixed; inset:0; background:rgba(255,255,255,0.75); z-index:300; align-items:center; justify-content:center; flex-direction:column; gap:14px; }
+.loading-overlay.active { display:flex; }
+.loading-spinner { width:42px; height:42px; border:4px solid #e2e8f0; border-top-color:#2b6cb0; border-radius:50%; animation:spin 0.75s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.loading-text { font-size:14px; color:#4a5568; font-weight:600; }
+.saving-badge { display:none; background:rgba(255,255,255,0.25); border:1px solid rgba(255,255,255,0.5); color:white; padding:3px 10px; border-radius:10px; font-size:11px; font-weight:600; letter-spacing:0.03em; }
+.saving-badge.active { display:inline-block; }
+
+@media (max-width: 600px) {
+  .container { padding: 12px; }
+  header { padding: 10px 14px; }
+  header h1 { font-size: 15px; }
+  .summary-bar { flex-wrap: wrap; gap: 12px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🏥 患者予約管理</h1>
+  <span class="saving-badge" id="saving-badge">保存中…</span>
+  <div class="date-nav">
+    <button onclick="changeDate(-1)">&#9664;</button>
+    <input type="date" id="date-input" onchange="loadDate(this.value)">
+    <button onclick="changeDate(1)">&#9654;</button>
+    <button class="today-btn" onclick="goToday()">今日</button>
+  </div>
+</header>
+
+<nav class="tab-bar">
+  <button class="tab active" data-tab="sched"  onclick="showTab('sched')">📅 予約表</button>
+  <button class="tab"        data-tab="master" onclick="showTab('master')">👥 患者マスタ</button>
+  <button class="tab"        data-tab="pay"    onclick="showTab('pay')">💴 支払い記録</button>
+</nav>
+
+<div class="container">
+
+  <!-- ═══ 予約表 ═══════════════════════════════════════════ -->
+  <div id="sched-section" class="section active">
+    <div class="summary-bar">
+      <div class="stat"><span class="stat-num" id="cnt-booked">0</span><span class="stat-label">予約件数</span></div>
+      <div class="vdiv"></div>
+      <div class="stat"><span class="stat-num" id="cnt-empty">0</span><span class="stat-label">空き枠</span></div>
+      <div class="vdiv"></div>
+      <div class="stat"><span class="stat-num" id="cnt-total">0</span><span class="stat-label">総枠数</span></div>
+      <div class="date-display" id="date-display"></div>
+    </div>
+    <div id="sched-grid-container"></div>
+  </div>
+
+  <!-- ═══ 患者マスタ ════════════════════════════════════════ -->
+  <div id="master-section" class="section">
+    <div class="panel">
+      <h2>👥 患者マスタ管理</h2>
+      <div class="master-form">
+        <div class="master-form-row">
+          <div class="fg fg-no">
+            <label for="reg-no">カルテ番号 <span style="color:#e53e3e">*</span></label>
+            <input type="text" id="reg-no" placeholder="例：A-00123" autocomplete="off">
+          </div>
+          <div class="fg fg-name">
+            <label for="reg-name">患者名 <span style="color:#e53e3e">*</span></label>
+            <input type="text" id="reg-name" placeholder="例：山田 太郎" autocomplete="off">
+          </div>
+          <div class="master-form-btns">
+            <button class="btn-register" id="reg-btn" onclick="addOrUpdateMaster()">登録</button>
+            <button class="btn-reg-cancel" id="reg-cancel-btn" onclick="cancelMasterEdit()" style="display:none">取消</button>
+          </div>
+        </div>
+      </div>
+      <div class="master-search">
+        <input type="text" id="master-search" placeholder="🔍 カルテ番号・患者名で検索" oninput="renderMaster()">
+        <span class="master-count" id="master-count"></span>
+      </div>
+      <table class="master-tbl">
+        <thead><tr><th>カルテ番号</th><th>患者名</th><th>登録日</th><th>操作</th></tr></thead>
+        <tbody id="master-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══ 支払い記録 ════════════════════════════════════════ -->
+  <div id="pay-section" class="section">
+    <div class="panel">
+      <h2>💴 回数券・支払い管理</h2>
+      <div class="pay-form" id="pay-form">
+        <div class="pf-g" id="pf-datetime-grp" style="display:none">
+          <label>購入日時</label>
+          <input id="pf-datetime" type="text" placeholder="2026/03/31 09:00" style="width:140px">
+        </div>
+        <div class="pf-g">
+          <label>カルテ番号</label>
+          <input id="pf-chart" type="text" placeholder="A-00123" oninput="payChartFill(this.value)">
+        </div>
+        <div class="pf-g">
+          <label>患者名</label>
+          <input id="pf-name" type="text" placeholder="山田 太郎" list="pf-datalist">
+          <datalist id="pf-datalist"></datalist>
+        </div>
+        <div class="pf-g">
+          <label>購入金額（円）</label>
+          <input id="pf-amount" type="text" placeholder="10000">
+        </div>
+        <div class="pf-g">
+          <label>支払方法</label>
+          <select id="pf-method">
+            <option value="現金">現金</option>
+            <option value="PayPay">PayPay</option>
+            <option value="クレジットカード">クレジットカード</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:6px;align-self:flex-end">
+          <button class="btn-record" id="pay-submit-btn" onclick="savePayment()">記録する</button>
+          <button class="btn-pay-cancel" id="pay-cancel-btn" onclick="cancelPaymentEdit()" style="display:none">取消</button>
+        </div>
+      </div>
+      <table class="pay-tbl">
+        <thead><tr><th>購入日時</th><th>カルテ番号</th><th>患者名</th><th>金額</th><th>支払方法</th><th>操作</th></tr></thead>
+        <tbody id="pay-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<!-- ═══ Appointment Modal ════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalBg(event)">
+  <div class="modal">
+    <h2 id="m-title">予約を追加</h2>
+    <div class="slot-info" id="m-slotinfo"></div>
+
+    <div class="seg-ctrl" id="slottype-ctrl">
+      <button class="seg-btn act-normal" id="btn-normal" onclick="selectSlotType('通常')">通常（15分）</button>
+      <button class="seg-btn" id="btn-newpt" onclick="selectSlotType('新患')">新患・再来院（75分）</button>
+    </div>
+    <div id="appttype-ctrl">
+      <div class="seg-ctrl">
+        <button class="seg-btn act-treat" id="btn-treat" onclick="selectApptType('施術')">施術</button>
+        <button class="seg-btn" id="btn-exam"  onclick="selectApptType('検査')">検査</button>
+      </div>
+    </div>
+    <div class="info-box" id="newpt-info" style="display:none">
+      📋 75分枠（5スロット）を確保します。治療1ラインで5枠を専有します。
+    </div>
+
+    <div class="input-row">
+      <div class="fg">
+        <label for="m-chart">カルテ番号</label>
+        <input type="text" id="m-chart" placeholder="A-00123" autocomplete="off">
+      </div>
+      <div class="fg">
+        <label for="m-name">患者名</label>
+        <input type="text" id="m-name" placeholder="山田 太郎" autocomplete="off" list="m-datalist">
+        <datalist id="m-datalist"></datalist>
+      </div>
+    </div>
+
+    <div class="fg">
+      <label for="m-memo">メモ（この時間枠）</label>
+      <textarea id="m-memo" placeholder="例：新患 要確認、初診書類あり　など"></textarea>
+    </div>
+
+    <hr class="section-sep">
+    <div class="section-label">患者設定</div>
+    <div class="chk-row">
+      <input type="checkbox" id="m-maint" onchange="onMaintChange()">
+      <label for="m-maint">メンテナンス患者（回数カウントなし）</label>
+    </div>
+    <div id="m-limit-grp" class="fg">
+      <label for="m-limit">検査までの施術回数</label>
+      <input type="number" id="m-limit" value="8" min="1" max="99">
+    </div>
+    <div class="prog-preview" id="m-progprev" style="display:none">
+      <div class="prog-label">現在の施術進捗</div>
+      <div class="prog-value" id="m-progval"></div>
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+      <button class="btn-del-modal" id="m-del-btn" onclick="deleteApptFromModal()" style="display:none">削除</button>
+      <button class="btn-save" onclick="saveAppt()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loading-text">データを読み込み中…</div>
+</div>
+
+<!-- ═══ History Popup ════════════════════════════════════════ -->
+<div class="modal-overlay" id="hist-overlay" onclick="closeHistoryBg(event)">
+  <div class="modal hist-modal">
+    <div class="hist-header">
+      <div>
+        <h2 id="hist-name"></h2>
+        <div class="hist-subtitle" id="hist-chart"></div>
+      </div>
+      <button class="hist-close" onclick="closeHistory()" title="閉じる">✕</button>
+    </div>
+    <div class="hist-meta" id="hist-meta"></div>
+    <table class="hist-tbl">
+      <thead><tr><th>日付</th><th>時間</th><th>種別</th><th>メモ</th></tr></thead>
+      <tbody id="hist-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────
+const SESSIONS = [
+  { startH: 8,  startM: 25, endH: 12, endM: 40, name: '午前' },
+  { startH: 14, startM: 25, endH: 19, endM: 25, name: '午後' },
+];
+const LINES = ['治療'];
+const NUM_LINES = 1;
+
+// ── State ─────────────────────────────────────────────────────────────
+let currentDate    = todayStr();
+let editingSlot    = null;
+let editingLineIdx = 0;
+let selSlotType    = '通常';
+let selApptType    = '施術';
+let masterEditKey      = null;
+let editingPaymentIdx  = null;
+
+// ── Utilities ─────────────────────────────────────────────────────────
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function formatDateJP(d) {
+  const dt = new Date(d + 'T00:00:00');
+  return `${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日（${'日月火水木金土'[dt.getDay()]}）`;
+}
+
+function generateSlots() {
+  const slots = [];
+  SESSIONS.forEach(sess => {
+    let h = sess.startH, m = sess.startM, lastH = -1;
+    while (h * 60 + m < sess.endH * 60 + sess.endM) {
+      const eMin = h * 60 + m + 15;
+      const eH = Math.floor(eMin / 60), eM = eMin % 60;
+      slots.push({
+        key:        `${String(h).padStart(2,'0')}${String(m).padStart(2,'0')}`,
+        label:      `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`,
+        end:        `${String(eH).padStart(2,'0')}:${String(eM).padStart(2,'0')}`,
+        isHourStart: h !== lastH,
+        session:    sess.name,
+      });
+      lastH = h;
+      m += 15;
+      if (m >= 60) { h++; m -= 60; }
+    }
+  });
+  return slots;
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── GAS Config ────────────────────────────────────────────────────────
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzk4U0Pbiw5-CATuJp4bzBfAvezFF0P9yJr8LYpKph-sJtJgyfVYSiZvAYgrT9k3PCeNQ/exec';
+
+// ── In-memory store (populated from GAS on load) ───────────────────────
+const store = {};
+
+// ── Loading / Saving UI ────────────────────────────────────────────────
+function showLoading(on, msg) {
+  const el = document.getElementById('loading-overlay');
+  if (on) {
+    document.getElementById('loading-text').textContent = msg || 'データを読み込み中…';
+    el.classList.add('active');
+  } else {
+    el.classList.remove('active');
+  }
+}
+
+let _pendingSaves = 0;
+function _setSaving(on) {
+  if (on) _pendingSaves++; else _pendingSaves = Math.max(0, _pendingSaves - 1);
+  document.getElementById('saving-badge').classList.toggle('active', _pendingSaves > 0);
+}
+
+// ── GAS communication ─────────────────────────────────────────────────
+
+// localStorage にあって GAS にないキーを GAS へ一括アップロード
+async function syncLocalToGAS(gasData) {
+  const isAppKey = k => k === 'patients' || k === 'patient_master' || k === 'payments'
+    || k.startsWith('appts_') || k.startsWith('memos_');
+
+  const keysToSync = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && isAppKey(k) && !(k in gasData)) keysToSync.push(k);
+  }
+  if (keysToSync.length === 0) return;
+
+  let done = 0;
+  showLoading(true, `ローカルデータをGASへ同期中… (0 / ${keysToSync.length}件)`);
+  for (const k of keysToSync) {
+    try {
+      const raw = localStorage.getItem(k);
+      if (!raw) continue;
+      const v = JSON.parse(raw);
+      store[k] = v;
+      const res = await fetch(GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'set', key: k, value: v }),
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      done++;
+      document.getElementById('loading-text').textContent =
+        `ローカルデータをGASへ同期中… (${done} / ${keysToSync.length}件)`;
+    } catch(e) {
+      console.warn('同期失敗 key=' + k, e);
+    }
+  }
+  showToast(`ローカルデータをGASへ同期しました（${done} / ${keysToSync.length}件）`);
+}
+
+async function gasLoadAll() {
+  showLoading(true, 'データを読み込み中…');
+  try {
+    const res = await fetch(GAS_URL + '?action=getAll');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const gasData = await res.json();
+    // GASのデータをstoreとlocalStorageへ反映
+    Object.entries(gasData).forEach(([k, v]) => {
+      store[k] = v;
+      try { localStorage.setItem(k, JSON.stringify(v)); } catch(_) {}
+    });
+    // localStorageにあってGASにないキーを同期（初回移行対応）
+    await syncLocalToGAS(gasData);
+    return true;
+  } catch(e) {
+    console.warn('GAS読み込み失敗。ローカルデータを使用します:', e);
+    // フォールバック: localStorageの全データをstoreへコピー
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k) try { store[k] = JSON.parse(localStorage.getItem(k)); } catch(_) {}
+    }
+    showToast('GAS読み込み失敗。ローカルデータを使用します');
+    return false;
+  } finally {
+    showLoading(false);
+  }
+}
+
+async function gasSave(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch(_) {}
+  store[key] = value;
+  _setSaving(true);
+  try {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'set', key, value }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+  } catch(e) {
+    console.warn('GAS保存失敗（ローカルに保存済み）:', e);
+    showToast('クラウド保存に失敗しました（ローカルに保存済み）');
+  } finally {
+    _setSaving(false);
+  }
+}
+
+// ── Storage ────────────────────────────────────────────────────────────
+const LS = {
+  get: k => {
+    if (store[k] !== undefined) return store[k];
+    return JSON.parse(localStorage.getItem(k) || '{}');
+  },
+  set: (k, v) => { gasSave(k, v); },
+};
+
+// loadAppts: migrates old {slot: apptObj} → new {slot: [appt,null,null,null]}
+function loadAppts(date) {
+  const raw = LS.get('appts_' + date);
+  const result = {};
+  Object.entries(raw).forEach(([k, v]) => {
+    if (Array.isArray(v)) {
+      result[k] = v.length >= NUM_LINES ? v.slice(0, NUM_LINES) : [...v, ...Array(NUM_LINES - v.length).fill(null)];
+    } else if (v && typeof v === 'object') {
+      result[k] = [v, null, null, null]; // migrate old single-appt format
+    }
+  });
+  return result;
+}
+
+function saveAppts(date, appts) {
+  // Remove slots where all lines are null
+  const clean = {};
+  Object.entries(appts).forEach(([k, arr]) => {
+    if (arr.some(a => a !== null)) clean[k] = arr;
+  });
+  LS.set('appts_' + date, clean);
+}
+
+const loadMemos        = date  => LS.get('memos_' + date);
+const saveMemos        = (d,v) => LS.set('memos_' + d, v);
+const loadPatients     = ()    => LS.get('patients');
+const savePatients     = d     => LS.set('patients', d);
+const loadPayments     = ()    => { const v = store['payments'] ?? JSON.parse(localStorage.getItem('payments') || '[]'); return Array.isArray(v) ? v : []; };
+const savePayments     = d     => gasSave('payments', d);
+const loadPatientMaster = ()   => LS.get('patient_master');
+const savePatientMaster = d    => LS.set('patient_master', d);
+
+// ── All appts keys (store + localStorage union) ────────────────────────
+function getAllApptKeys() {
+  const keys = new Set();
+  Object.keys(store).forEach(k => { if (k.startsWith('appts_')) keys.add(k); });
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('appts_')) keys.add(k);
+  }
+  return keys;
+}
+
+// ── Patient lookup ─────────────────────────────────────────────────────
+function pKey(chart, name) { return chart ? 'c_' + chart : 'n_' + name; }
+
+function lookupNameByChart(chart) {
+  if (!chart) return null;
+  const master = loadPatientMaster();
+  if (master[chart]) return master[chart].name;
+  const patients = loadPatients();
+  const found = Object.values(patients).find(p => p.chart === chart);
+  return found ? found.name : null;
+}
+
+function lookupChartByName(name) {
+  if (!name) return null;
+  const master = loadPatientMaster();
+  const found = Object.values(master).find(p => p.name === name);
+  return found ? found.no : null;
+}
+
+// ── Treatment count ───────────────────────────────────────────────────
+function calcCount(patKey) {
+  const evts = [];
+  getAllApptKeys().forEach(k => {
+    const date = k.slice(6);
+    const day  = store[k] ?? JSON.parse(localStorage.getItem(k) || '{}');
+    Object.entries(day).forEach(([slot, val]) => {
+      const arr = Array.isArray(val) ? val : [val];
+      arr.forEach(a => {
+        if (a && pKey(a.chart, a.name) === patKey)
+          evts.push({ date, slot, type: a.type });
+      });
+    });
+  });
+  evts.sort((a,b) => a.date !== b.date ? a.date.localeCompare(b.date) : a.slot.localeCompare(b.slot));
+  let c = 0;
+  evts.forEach(e => { if (e.type === '検査') c = 0; else c++; });
+  return c;
+}
+
+// ── Tab navigation ────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.getElementById(name + '-section').classList.add('active');
+}
+
+// ── Build one session block (returns DOM element) ─────────────────────
+function buildSessionBlock(sessionName, slots, appts, memos, patients, countCache) {
+  const block = document.createElement('div');
+  block.className = 'sched-block';
+
+  const label = document.createElement('div');
+  label.className = 'sched-session-label';
+  label.textContent = `── ${sessionName}`;
+  block.appendChild(label);
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'sched-wrapper';
+
+  const table = document.createElement('table');
+  table.className = 'sched-grid';
+
+  // ── Header row ──
+  const thead = document.createElement('thead');
+  const hRow  = document.createElement('tr');
+
+  const thCorner = document.createElement('th');
+  thCorner.className = 'sticky-col corner-hdr';
+  hRow.appendChild(thCorner);
+
+  slots.forEach(slot => {
+    const th = document.createElement('th');
+    th.className = 'time-hdr' + (slot.isHourStart ? ' hour-col' : '');
+    th.innerHTML = `<span class="t-main">${slot.label}</span>`;
+    hRow.appendChild(th);
+  });
+
+  thead.appendChild(hRow);
+  table.appendChild(thead);
+
+  // ── Body ──
+  const tbody = document.createElement('tbody');
+
+  // ── 治療 row (1 appointment per slot) ──
+  const treatRow = document.createElement('tr');
+
+  const tdTreatLabel = document.createElement('td');
+  tdTreatLabel.className = 'sticky-col line-label';
+  tdTreatLabel.textContent = '治療';
+  treatRow.appendChild(tdTreatLabel);
+
+  let skipUntil = -1;
+
+  slots.forEach((slot, si) => {
+    if (si < skipUntil) return; // covered by colspan
+
+    const slotArr = appts[slot.key] || [null];
+    const appt = slotArr[0] || null;
+    const td = document.createElement('td');
+
+    if (appt) {
+      let span = 1;
+      if (appt.slotType === '新患') {
+        for (let j = si + 1; j < slots.length && slots[j].session === slot.session && span < 5; j++) span++;
+        td.colSpan = span;
+        skipUntil = si + span;
+        td.className = 'appt-cell filled-newpt';
+      } else {
+        td.className = 'appt-cell ' + (appt.type === '検査' ? 'filled-exam' : 'filled-treat');
+      }
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'cell-name';
+      nameEl.textContent = appt.name;
+      const _chart = appt.chart || '', _name = appt.name;
+      nameEl.addEventListener('click', e => { e.stopPropagation(); openHistory(_chart, _name); });
+      td.appendChild(nameEl);
+
+      if (appt.chart) {
+        const chartEl = document.createElement('div');
+        chartEl.className = 'cell-chart';
+        chartEl.textContent = appt.chart;
+        td.appendChild(chartEl);
+      }
+
+      const badgeEl = document.createElement('div');
+      badgeEl.className = 'cell-badge';
+      if (appt.slotType === '新患') {
+        badgeEl.innerHTML = '<span class="badge b-newpt">新患 75分</span>';
+      } else {
+        const k = pKey(appt.chart, appt.name);
+        const pat = patients[k];
+        if (pat && pat.isMaintenance) {
+          badgeEl.innerHTML = '<span class="badge b-maint">メンテ</span>';
+        } else if (appt.type === '検査') {
+          badgeEl.innerHTML = '<span class="badge b-ed">検査</span>';
+        } else if (pat) {
+          const cnt = countCache[k] ?? 0, lim = pat.treatmentLimit || 8;
+          if (cnt >= lim)              badgeEl.innerHTML = `<span class="badge b-w1">⚠${cnt}/${lim}</span>`;
+          else if (cnt / lim >= 0.75)  badgeEl.innerHTML = `<span class="badge b-w0">${cnt}/${lim}</span>`;
+          else                          badgeEl.innerHTML = `<span class="badge b-ok">${cnt}/${lim}</span>`;
+        } else {
+          badgeEl.innerHTML = `<span class="badge b-treat">${esc(appt.type || '施術')}</span>`;
+        }
+      }
+      td.appendChild(badgeEl);
+      td.addEventListener('click', () => openModal(slot, 0, appt));
+
+    } else {
+      td.className = 'appt-cell empty-cell';
+      const plus = document.createElement('div');
+      plus.className = 'cell-plus';
+      plus.textContent = '＋';
+      td.appendChild(plus);
+      td.addEventListener('click', () => openModal(slot, 0, null));
+    }
+
+    treatRow.appendChild(td);
+  });
+
+  tbody.appendChild(treatRow);
+
+  // ── メモ row (free-text per slot, contenteditable) ──
+  const memoRow = document.createElement('tr');
+
+  const tdMemoLabel = document.createElement('td');
+  tdMemoLabel.className = 'sticky-col line-label memo-label-cell';
+  tdMemoLabel.textContent = 'メモ';
+  memoRow.appendChild(tdMemoLabel);
+
+  slots.forEach(slot => {
+    const td = document.createElement('td');
+    td.className = 'memo-row-cell';
+    td.contentEditable = 'true';
+    td.dataset.ph = 'メモ';
+    td.dataset.slot = slot.key;
+    const txt = memos[slot.key] || '';
+    if (txt) td.textContent = txt;
+
+    td.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); td.blur(); }
+      e.stopPropagation();
+    });
+
+    td.addEventListener('blur', () => {
+      const val = td.textContent.trim();
+      const dayMemos = loadMemos(currentDate);
+      if (val) dayMemos[slot.key] = val; else delete dayMemos[slot.key];
+      saveMemos(currentDate, dayMemos);
+    });
+
+    memoRow.appendChild(td);
+  });
+
+  tbody.appendChild(memoRow);
+
+  table.appendChild(tbody);
+  wrapper.appendChild(table);
+  block.appendChild(wrapper);
+  return block;
+}
+
+// ── Render schedule ────────────────────────────────────────────────────
+function renderTable() {
+  const slots    = generateSlots();
+  const appts    = loadAppts(currentDate);
+  const memos    = loadMemos(currentDate);
+  const patients = loadPatients();
+
+  // Pre-compute count cache
+  const countCache = {};
+  Object.values(appts).forEach(arr => {
+    arr.forEach(a => {
+      if (!a) return;
+      const k = pKey(a.chart, a.name);
+      if (!(k in countCache)) countCache[k] = calcCount(k);
+    });
+  });
+
+  // Stats (1 treatment slot per time slot)
+  let booked = 0;
+  Object.values(appts).forEach(arr => { if (arr[0]) booked++; });
+  const total = slots.length;
+
+  const container = document.getElementById('sched-grid-container');
+  container.innerHTML = '';
+
+  const amSlots = slots.filter(s => s.session === '午前');
+  const pmSlots = slots.filter(s => s.session === '午後');
+
+  container.appendChild(buildSessionBlock('午前', amSlots, appts, memos, patients, countCache));
+
+  const lunch = document.createElement('div');
+  lunch.className = 'lunch-banner';
+  lunch.textContent = '🍱 昼　休　み　  12:40 〜 14:25';
+  container.appendChild(lunch);
+
+  container.appendChild(buildSessionBlock('午後', pmSlots, appts, memos, patients, countCache));
+
+  document.getElementById('cnt-booked').textContent = booked;
+  document.getElementById('cnt-empty').textContent  = total - booked;
+  document.getElementById('cnt-total').textContent  = total;
+  document.getElementById('date-display').textContent = formatDateJP(currentDate);
+  document.getElementById('date-input').value = currentDate;
+}
+
+// ── Memo editing ──────────────────────────────────────────────────────
+function editMemo(slotKey, slotLabel) {
+  const memos  = loadMemos(currentDate);
+  const result = window.prompt(`${slotLabel} のメモ（空で削除）:`, memos[slotKey] || '');
+  if (result === null) return;
+  if (result.trim()) memos[slotKey] = result.trim(); else delete memos[slotKey];
+  saveMemos(currentDate, memos);
+  renderTable();
+  showToast(result.trim() ? 'メモを保存しました' : 'メモを削除しました');
+}
+
+// ── Appointment modal ─────────────────────────────────────────────────
+function openModal(slot, lineIdx, existing) {
+  editingSlot    = slot;
+  editingLineIdx = lineIdx;
+
+  document.getElementById('m-title').textContent = existing ? '予約を編集' : '予約を追加';
+  document.getElementById('m-slotinfo').textContent =
+    `${formatDateJP(currentDate)}　${slot.label}〜${slot.end}`;
+
+  document.getElementById('slottype-ctrl').style.display = '';
+
+  document.getElementById('m-memo').value = loadMemos(currentDate)[slot.key] || '';
+  document.getElementById('m-del-btn').style.display = existing ? '' : 'none';
+  updatePatientDatalist();
+
+  if (existing) {
+    document.getElementById('m-chart').value = existing.chart || '';
+    document.getElementById('m-name').value  = existing.name;
+    selectSlotType(existing.slotType || '通常');
+    selectApptType(existing.type    || '施術');
+    loadPatientSettings(existing.chart || '', existing.name);
+  } else {
+    document.getElementById('m-chart').value = '';
+    document.getElementById('m-name').value  = '';
+    selectSlotType('通常');
+    selectApptType('施術');
+    document.getElementById('m-maint').checked = false;
+    document.getElementById('m-limit').value   = 8;
+    document.getElementById('m-limit-grp').style.display = '';
+    document.getElementById('m-progprev').style.display  = 'none';
+  }
+
+  document.getElementById('modal-overlay').classList.add('active');
+  setTimeout(() => document.getElementById('m-chart').focus(), 50);
+}
+
+function closeModal() { document.getElementById('modal-overlay').classList.remove('active'); editingSlot = null; }
+function closeModalBg(e) { if (e.target === document.getElementById('modal-overlay')) closeModal(); }
+
+function selectSlotType(t) {
+  selSlotType = t;
+  document.getElementById('btn-normal').className = 'seg-btn' + (t === '通常' ? ' act-normal' : '');
+  document.getElementById('btn-newpt').className  = 'seg-btn' + (t === '新患'  ? ' act-newpt'  : '');
+  document.getElementById('appttype-ctrl').style.display = t === '新患' ? 'none' : '';
+  document.getElementById('newpt-info').style.display    = t === '新患' ? ''     : 'none';
+  if (t === '新患') selApptType = '施術';
+}
+
+function selectApptType(t) {
+  selApptType = t;
+  document.getElementById('btn-treat').className = 'seg-btn' + (t === '施術' ? ' act-treat' : '');
+  document.getElementById('btn-exam').className  = 'seg-btn' + (t === '検査' ? ' act-exam'  : '');
+}
+
+function onMaintChange() {
+  const m = document.getElementById('m-maint').checked;
+  document.getElementById('m-limit-grp').style.display = m ? 'none' : '';
+  if (m) document.getElementById('m-progprev').style.display = 'none'; else refreshProgPreview();
+}
+
+function refreshProgPreview() {
+  const chart = document.getElementById('m-chart').value.trim();
+  const name  = document.getElementById('m-name').value.trim();
+  if (!name && !chart) { document.getElementById('m-progprev').style.display = 'none'; return; }
+  const k = pKey(chart, name), p = loadPatients()[k];
+  if (!p || p.isMaintenance) { document.getElementById('m-progprev').style.display = 'none'; return; }
+  const cnt   = calcCount(k);
+  const limit = parseInt(document.getElementById('m-limit').value) || p.treatmentLimit || 8;
+  const el = document.getElementById('m-progval');
+  document.getElementById('m-progprev').style.display = '';
+  el.textContent  = cnt >= limit ? `${cnt}/${limit}回　⚠ 次回は検査を推奨` : `${cnt}/${limit}回`;
+  el.className    = 'prog-value ' + (cnt >= limit ? 'warning' : cnt / limit >= 0.75 ? 'caution' : 'ok');
+}
+
+function loadPatientSettings(chart, name) {
+  const p = loadPatients()[pKey(chart, name)];
+  document.getElementById('m-maint').checked = p?.isMaintenance || false;
+  document.getElementById('m-limit').value   = p?.treatmentLimit || 8;
+  onMaintChange();
+}
+
+function updatePatientDatalist() {
+  const master   = loadPatientMaster();
+  const patients = loadPatients();
+  const names    = new Set();
+  Object.values(master).forEach(p => names.add(p.name));
+  Object.values(patients).forEach(p => names.add(p.name));
+  ['m-datalist', 'pf-datalist'].forEach(id => {
+    const dl = document.getElementById(id);
+    if (!dl) return;
+    dl.innerHTML = '';
+    names.forEach(n => { const o = document.createElement('option'); o.value = n; dl.appendChild(o); });
+  });
+}
+
+// ── Appointment save/delete ───────────────────────────────────────────
+function saveAppt() {
+  const name  = document.getElementById('m-name').value.trim();
+  const chart = document.getElementById('m-chart').value.trim();
+  const limit = parseInt(document.getElementById('m-limit').value) || 8;
+  const isMaintenance = document.getElementById('m-maint').checked;
+  const memo  = document.getElementById('m-memo').value.trim();
+  const apptType = selApptType;
+  const slotType = (editingLineIdx === 0) ? selSlotType : '通常';
+
+  if (!name) { showToast('患者名を入力してください'); document.getElementById('m-name').focus(); return; }
+
+  // Validate 新患 75-min block: check next 4 slots on the same line are free
+  if (slotType === '新患') {
+    const slots = generateSlots();
+    const si = slots.findIndex(s => s.key === editingSlot.key);
+    const dayAppts = loadAppts(currentDate);
+    for (let i = 1; i <= 4; i++) {
+      const ns = slots[si + i];
+      if (!ns || ns.session !== editingSlot.session) break;
+      const arr = dayAppts[ns.key] || [null,null,null,null];
+      if (arr[editingLineIdx]) {
+        showToast(`${ns.label} に既存の予約があるため75分枠は設定できません`);
+        return;
+      }
+    }
+  }
+
+  // Save patient settings
+  const patients = loadPatients();
+  const k = pKey(chart, name);
+  patients[k] = {
+    name, chart,
+    treatmentLimit: isMaintenance ? (patients[k]?.treatmentLimit || 8) : limit,
+    isMaintenance
+  };
+  savePatients(patients);
+
+  // Save appointment into array slot
+  const appts = loadAppts(currentDate);
+  if (!appts[editingSlot.key]) appts[editingSlot.key] = [null, null, null, null];
+  appts[editingSlot.key][editingLineIdx] = { name, chart, type: apptType, slotType };
+  saveAppts(currentDate, appts);
+
+  // Save memo
+  const memos = loadMemos(currentDate);
+  if (memo) memos[editingSlot.key] = memo; else delete memos[editingSlot.key];
+  saveMemos(currentDate, memos);
+
+  closeModal();
+  renderTable();
+  showToast('予約を保存しました');
+}
+
+function deleteApptFromModal() {
+  if (!confirm(`${editingSlot.label}〜${editingSlot.end} の予約を削除しますか？`)) return;
+  const appts = loadAppts(currentDate);
+  if (appts[editingSlot.key]) {
+    appts[editingSlot.key][editingLineIdx] = null;
+    if (appts[editingSlot.key].every(a => a === null)) delete appts[editingSlot.key];
+  }
+  saveAppts(currentDate, appts);
+  closeModal();
+  renderTable();
+  showToast('予約を削除しました');
+}
+
+// ── Patient Master ─────────────────────────────────────────────────────
+function renderMaster() {
+  const master = loadPatientMaster();
+  const filter = document.getElementById('master-search')?.value.trim().toLowerCase() || '';
+  const tbody  = document.getElementById('master-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  let entries = Object.values(master);
+  if (filter) entries = entries.filter(p =>
+    p.no.toLowerCase().includes(filter) || p.name.toLowerCase().includes(filter));
+  entries.sort((a, b) => a.no.localeCompare(b.no, 'ja'));
+
+  document.getElementById('master-count').textContent =
+    `全 ${Object.keys(master).length} 件` + (filter ? `（${entries.length} 件表示）` : '');
+
+  if (!entries.length) {
+    tbody.innerHTML = `<tr><td colspan="4" class="no-master">${filter ? '一致する患者が見つかりません' : '患者が登録されていません'}</td></tr>`;
+    return;
+  }
+
+  entries.forEach(p => {
+    const tr = document.createElement('tr');
+    if (masterEditKey === p.no) tr.classList.add('editing-row');
+    tr.innerHTML = `
+      <td style="font-weight:600">${esc(p.no)}</td>
+      <td>${esc(p.name)}</td>
+      <td style="color:#718096">${esc(p.registeredAt || '')}</td>
+      <td>
+        <button class="btn-edit-sm" onclick="editMasterEntry('${esc(p.no)}')">編集</button>
+        <button class="btn-del-sm"  onclick="deleteMaster('${esc(p.no)}')">削除</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function addOrUpdateMaster() {
+  const no   = document.getElementById('reg-no').value.trim();
+  const name = document.getElementById('reg-name').value.trim();
+  if (!no)   { showToast('カルテ番号を入力してください'); document.getElementById('reg-no').focus();   return; }
+  if (!name) { showToast('患者名を入力してください');     document.getElementById('reg-name').focus(); return; }
+
+  const master = loadPatientMaster();
+  if (!masterEditKey && master[no] && master[no].name !== name) {
+    if (!confirm(`カルテ番号 ${no} はすでに「${master[no].name}」として登録されています。上書きしますか？`)) return;
+  }
+  const today = todayStr();
+  master[no] = { no, name, registeredAt: masterEditKey ? (master[no]?.registeredAt || today) : today };
+  savePatientMaster(master);
+
+  document.getElementById('reg-no').value   = '';
+  document.getElementById('reg-name').value = '';
+  document.getElementById('reg-no').disabled = false;
+  cancelMasterEdit();
+  renderMaster();
+  updatePatientDatalist();
+  showToast(masterEditKey ? '患者情報を更新しました' : '患者を登録しました');
+  masterEditKey = null;
+}
+
+function editMasterEntry(no) {
+  const p = loadPatientMaster()[no];
+  if (!p) return;
+  masterEditKey = no;
+  document.getElementById('reg-no').value    = p.no;
+  document.getElementById('reg-name').value  = p.name;
+  document.getElementById('reg-no').disabled = true;
+  document.getElementById('reg-btn').textContent = '更新';
+  document.getElementById('reg-cancel-btn').style.display = '';
+  document.getElementById('reg-name').focus();
+  renderMaster();
+}
+
+function cancelMasterEdit() {
+  masterEditKey = null;
+  document.getElementById('reg-no').value    = '';
+  document.getElementById('reg-name').value  = '';
+  document.getElementById('reg-no').disabled = false;
+  document.getElementById('reg-btn').textContent = '登録';
+  document.getElementById('reg-cancel-btn').style.display = 'none';
+  renderMaster();
+}
+
+function deleteMaster(no) {
+  const p = loadPatientMaster()[no];
+  if (!p) return;
+  if (!confirm(`「${p.name}」（${p.no}）を削除しますか？`)) return;
+  const master = loadPatientMaster();
+  delete master[no];
+  savePatientMaster(master);
+  if (masterEditKey === no) cancelMasterEdit();
+  renderMaster();
+  updatePatientDatalist();
+  showToast('患者を削除しました');
+}
+
+// ── Payment ────────────────────────────────────────────────────────────
+function payChartFill(val) {
+  const name = lookupNameByChart(val.trim());
+  if (name) document.getElementById('pf-name').value = name;
+}
+
+function renderPayments() {
+  const pays  = loadPayments();
+  const tbody = document.getElementById('pay-body');
+  if (!pays.length) { tbody.innerHTML = '<tr><td colspan="6" class="no-pay">購入記録がありません</td></tr>'; return; }
+  tbody.innerHTML = '';
+  pays.slice().reverse().forEach((p, ri) => {
+    const idx = pays.length - 1 - ri;
+    const cls = p.method === '現金' ? 'm-cash' : p.method === 'PayPay' ? 'm-paypay' : 'm-card';
+    const tr  = document.createElement('tr');
+    if (idx === editingPaymentIdx) tr.classList.add('pay-editing-row');
+    tr.innerHTML = `<td>${esc(p.datetime)}</td><td>${esc(p.chart||'－')}</td><td>${esc(p.name)}</td>
+      <td>¥${Number(p.amount).toLocaleString()}</td>
+      <td><span class="${cls}">${esc(p.method)}</span></td>
+      <td>
+        <button class="btn-editpay" onclick="editPayment(${idx})">編集</button>
+        <button class="btn-delpay"  onclick="deletePayment(${idx})">削除</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function editPayment(idx) {
+  const pays = loadPayments();
+  const p = pays[idx];
+  if (!p) return;
+  editingPaymentIdx = idx;
+  document.getElementById('pf-chart').value    = p.chart || '';
+  document.getElementById('pf-name').value     = p.name;
+  document.getElementById('pf-amount').value   = p.amount;
+  document.getElementById('pf-method').value   = p.method;
+  document.getElementById('pf-datetime').value = p.datetime;
+  document.getElementById('pf-datetime-grp').style.display  = '';
+  document.getElementById('pay-submit-btn').textContent      = '更新する';
+  document.getElementById('pay-cancel-btn').style.display    = '';
+  renderPayments();
+  document.getElementById('pay-form').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  document.getElementById('pf-name').focus();
+}
+
+function cancelPaymentEdit() {
+  editingPaymentIdx = null;
+  document.getElementById('pf-chart').value  = '';
+  document.getElementById('pf-name').value   = '';
+  document.getElementById('pf-amount').value = '';
+  document.getElementById('pf-datetime-grp').style.display = 'none';
+  document.getElementById('pay-submit-btn').textContent     = '記録する';
+  document.getElementById('pay-cancel-btn').style.display   = 'none';
+  renderPayments();
+}
+
+function savePayment() {
+  const name   = document.getElementById('pf-name').value.trim();
+  const chart  = document.getElementById('pf-chart').value.trim();
+  const amount = document.getElementById('pf-amount').value.trim().replace(/,/g, '');
+  const method = document.getElementById('pf-method').value;
+  if (!name)                    { showToast('患者名を入力してください');     return; }
+  if (!amount || isNaN(+amount)) { showToast('正しい金額を入力してください'); return; }
+
+  const pays = loadPayments();
+
+  if (editingPaymentIdx !== null) {
+    const datetime = document.getElementById('pf-datetime').value.trim() || pays[editingPaymentIdx].datetime;
+    pays[editingPaymentIdx] = { ...pays[editingPaymentIdx], datetime, name, chart, amount: +amount, method };
+    savePayments(pays);
+    cancelPaymentEdit();
+    showToast('支払い記録を更新しました');
+  } else {
+    const now = new Date();
+    const dt  = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    pays.push({ id: Date.now(), datetime: dt, name, chart, amount: +amount, method });
+    savePayments(pays);
+    document.getElementById('pf-name').value   = '';
+    document.getElementById('pf-chart').value  = '';
+    document.getElementById('pf-amount').value = '';
+    renderPayments();
+    showToast('支払いを記録しました');
+  }
+}
+
+function deletePayment(idx) {
+  if (!confirm('この記録を削除しますか？')) return;
+  if (editingPaymentIdx === idx) cancelPaymentEdit();
+  const pays = loadPayments(); pays.splice(idx, 1); savePayments(pays);
+  renderPayments(); showToast('記録を削除しました');
+}
+
+// ── History popup ─────────────────────────────────────────────────────
+function openHistory(chart, name) {
+  const key     = pKey(chart, name);
+  const history = [];
+
+  getAllApptKeys().forEach(k => {
+    const dateStr  = k.slice(6);
+    const dayAppts = store[k] ?? JSON.parse(localStorage.getItem(k) || '{}');
+    const memoKey  = 'memos_' + dateStr;
+    const dayMemos = store[memoKey] ?? JSON.parse(localStorage.getItem(memoKey) || '{}');
+
+    Object.entries(dayAppts).forEach(([slotKey, val]) => {
+      const arr = Array.isArray(val) ? val : [val];
+      arr.forEach(a => {
+        if (!a || pKey(a.chart, a.name) !== key) return;
+        const h = slotKey.slice(0, 2), m = slotKey.slice(2, 4);
+        const eMin = parseInt(h) * 60 + parseInt(m) + 15;
+        const eH = Math.floor(eMin / 60), eM = eMin % 60;
+        history.push({
+          dateStr, slotKey,
+          timeLabel: `${h}:${m}〜${String(eH).padStart(2,'0')}:${String(eM).padStart(2,'0')}`,
+          type:     a.type     || '施術',
+          slotType: a.slotType || '通常',
+          memo:     dayMemos[slotKey] || '',
+        });
+      });
+    });
+  });
+
+  history.sort((a, b) =>
+    a.dateStr !== b.dateStr ? b.dateStr.localeCompare(a.dateStr) : b.slotKey.localeCompare(a.slotKey)
+  );
+
+  document.getElementById('hist-name').textContent  = name;
+  document.getElementById('hist-chart').textContent = chart ? `カルテ番号：${chart}` : '';
+  document.getElementById('hist-meta').textContent  = `予約履歴　全 ${history.length} 件`;
+
+  const tbody = document.getElementById('hist-body');
+  if (!history.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="no-hist">予約履歴がありません</td></tr>';
+  } else {
+    tbody.innerHTML = '';
+    history.forEach(h => {
+      const d        = new Date(h.dateStr + 'T00:00:00');
+      const dow      = '日月火水木金土'[d.getDay()];
+      const isToday  = h.dateStr === currentDate;
+      const dateLbl  = `${h.dateStr.replace(/-/g, '/')}（${dow}）`;
+      const typeCls  = h.type === '施術' ? 'b-treat' : 'b-exam';
+      const newBadge = h.slotType === '新患' ? ' <span class="badge b-newpt" style="margin-left:3px">新患</span>' : '';
+      const tr = document.createElement('tr');
+      if (isToday) tr.classList.add('hist-today');
+      tr.innerHTML = `
+        <td>${esc(dateLbl)}${isToday ? ' <span style="font-size:10px;color:#2b6cb0;font-weight:700">今日</span>' : ''}</td>
+        <td>${esc(h.timeLabel)}</td>
+        <td><span class="badge ${typeCls}">${esc(h.type)}</span>${newBadge}</td>
+        <td class="hist-memo-cell">${esc(h.memo)}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  document.getElementById('hist-overlay').classList.add('active');
+}
+
+function closeHistory()    { document.getElementById('hist-overlay').classList.remove('active'); }
+function closeHistoryBg(e) { if (e.target === document.getElementById('hist-overlay')) closeHistory(); }
+
+// ── Date navigation ────────────────────────────────────────────────────
+function changeDate(d) {
+  const dt = new Date(currentDate + 'T00:00:00');
+  dt.setDate(dt.getDate() + d);
+  currentDate = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  renderTable();
+}
+function loadDate(v) { if (v) { currentDate = v; renderTable(); } }
+function goToday()   { currentDate = todayStr(); renderTable(); }
+
+// ── Toast ──────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ── Event listeners ────────────────────────────────────────────────────
+document.getElementById('m-chart').addEventListener('input', function() {
+  const chart = this.value.trim();
+  if (!chart) return;
+  const name = lookupNameByChart(chart);
+  if (name) {
+    document.getElementById('m-name').value = name;
+    loadPatientSettings(chart, name);
+    refreshProgPreview();
+  }
+});
+
+document.getElementById('m-name').addEventListener('change', function() {
+  const name  = this.value.trim();
+  const chart = document.getElementById('m-chart').value.trim();
+  if (!chart && name) {
+    const c = lookupChartByName(name);
+    if (c) {
+      document.getElementById('m-chart').value = c;
+      loadPatientSettings(c, name);
+    }
+    refreshProgPreview();
+  }
+});
+
+document.getElementById('m-limit').addEventListener('input', refreshProgPreview);
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeModal(); closeHistory(); }
+});
+
+document.getElementById('reg-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addOrUpdateMaster();
+});
+
+// ── Init ──────────────────────────────────────────────────────────────
+(async () => {
+  await gasLoadAll();
+  renderTable();
+  renderPayments();
+  renderMaster();
+  updatePatientDatalist();
+})();
+</script>
+</body>
+</html>
