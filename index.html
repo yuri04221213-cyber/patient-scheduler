@@ -537,6 +537,7 @@ function esc(s) {
 
 // ── GAS Config ────────────────────────────────────────────────────────
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzk4U0Pbiw5-CATuJp4bzBfAvezFF0P9yJr8LYpKph-sJtJgyfVYSiZvAYgrT9k3PCeNQ/exec';
+const GAS_KEY = 'bf9b4e1f297794b5fd900a7059bf7003';
 
 // ── In-memory store (populated from GAS on load) ───────────────────────
 const store = {};
@@ -582,7 +583,7 @@ async function syncLocalToGAS(gasData) {
       store[k] = v;
       const res = await fetch(GAS_URL, {
         method: 'POST',
-        body: JSON.stringify({ action: 'set', key: k, value: v }),
+        body: JSON.stringify({ action: 'set', key: k, value: v, secret: GAS_KEY }),
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       done++;
@@ -598,7 +599,7 @@ async function syncLocalToGAS(gasData) {
 async function gasLoadAll() {
   showLoading(true, 'データを読み込み中…');
   try {
-    const res = await fetch(GAS_URL + '?action=getAll');
+    const res = await fetch(GAS_URL + '?action=getAll&key=' + GAS_KEY);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const gasData = await res.json();
     // GASのデータをstoreとlocalStorageへ反映
@@ -630,7 +631,7 @@ async function gasSave(key, value) {
   try {
     const res = await fetch(GAS_URL, {
       method: 'POST',
-      body: JSON.stringify({ action: 'set', key, value }),
+      body: JSON.stringify({ action: 'set', key, value, secret: GAS_KEY }),
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
   } catch(e) {
