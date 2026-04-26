@@ -480,7 +480,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-async function _startApp() {
 
 // ── Constants ──────────────────────────────────────────────────────────
 const SESSIONS = [
@@ -1420,6 +1419,7 @@ document.getElementById('reg-name').addEventListener('keydown', e => {
 });
 
 // ── Init ──────────────────────────────────────────────────────────────
+async function _startApp() {
   await gasLoadAll();
   renderTable();
   renderPayments();
